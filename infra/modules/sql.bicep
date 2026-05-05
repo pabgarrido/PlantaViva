@@ -1,7 +1,11 @@
 param env string
 param location string
 param tags object
-param adminPasswordSecretUri string
+param kvName string
+
+@secure()
+@description('SQL admin password — generated at deploy time and stored in Key Vault')
+param adminPassword string
 
 var serverName = 'sql-plantaviva-${env}'
 var dbName = 'plantaviva-${env}'
@@ -12,12 +16,26 @@ resource sqlServer 'Microsoft.Sql/servers@2023-08-01-preview' = {
   tags: tags
   properties: {
     administratorLogin: 'pvadmin'
-    administratorLoginPassword: adminPasswordSecretUri // Will be set via Key Vault ref
+    administratorLoginPassword: adminPassword
     minimalTlsVersion: '1.2'
     publicNetworkAccess: env == 'prod' ? 'Disabled' : 'Enabled'
   }
   identity: {
     type: 'SystemAssigned'
+  }
+}
+
+// Store the password in Key Vault
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: kvName
+}
+
+resource sqlPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'sql-admin-password'
+  properties: {
+    value: adminPassword
+    contentType: 'text/plain'
   }
 }
 
@@ -48,4 +66,6 @@ resource firewallAllowAzure 'Microsoft.Sql/servers/firewallRules@2023-08-01-prev
 }
 
 output sqlServerFqdn string = sqlServer.properties.fullyQualifiedDomainName
+output sqlServerId string = sqlServer.id
 output sqlDatabaseName string = sqlDb.name
+output sqlServerPrincipalId string = sqlServer.identity.principalId

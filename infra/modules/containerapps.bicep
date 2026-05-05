@@ -2,21 +2,14 @@ param env string
 param location string
 param tags object
 param vnetSubnetId string
+param logAnalyticsWorkspaceId string
 
 var envName = 'cae-plantaviva-${env}'
 var parserWorkerName = 'ca-pv-parser-${env}'
 var renderWorkerName = 'ca-pv-render-${env}'
 
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: 'log-plantaviva-${env}'
-  location: location
-  tags: tags
-  properties: {
-    sku: {
-      name: 'PerGB2018'
-    }
-    retentionInDays: env == 'prod' ? 90 : 30
-  }
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: last(split(logAnalyticsWorkspaceId, '/'))
 }
 
 resource containerAppsEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {

@@ -88,3 +88,4 @@ resource sharesContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
 
 output cosmosAccountName string = cosmosAccount.name
 output cosmosEndpoint string = cosmosAccount.properties.documentEndpoint
+output cosmosAccountId string = cosmosAccount.id

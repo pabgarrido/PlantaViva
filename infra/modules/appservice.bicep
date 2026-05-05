@@ -1,6 +1,8 @@
 param env string
 param location string
 param tags object
+param appInsightsConnectionString string
+param vnetSubnetId string
 
 var planName = 'asp-plantaviva-${env}'
 var coreApiName = 'app-pv-core-api-${env}'
@@ -31,6 +33,7 @@ resource coreApi 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
+    virtualNetworkSubnetId: vnetSubnetId
     siteConfig: {
       linuxFxVersion: 'NODE|20-lts'
       alwaysOn: env == 'prod'
@@ -44,6 +47,10 @@ resource coreApi 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'WEBSITE_RUN_FROM_PACKAGE'
           value: '1'
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: appInsightsConnectionString
         }
         {
           name: 'FEATURE_PDF_PARSER'
@@ -73,6 +80,7 @@ resource deliveryApi 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     httpsOnly: true
+    virtualNetworkSubnetId: vnetSubnetId
     siteConfig: {
       linuxFxVersion: 'NODE|20-lts'
       alwaysOn: env == 'prod'
@@ -86,6 +94,10 @@ resource deliveryApi 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'WEBSITE_RUN_FROM_PACKAGE'
           value: '1'
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: appInsightsConnectionString
         }
         {
           name: 'FEATURE_PDF_PARSER'
