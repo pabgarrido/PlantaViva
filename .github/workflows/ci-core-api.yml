@@ -1,0 +1,43 @@
+name: CI — Core API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/core-api/**'
+      - 'packages/**'
+      - '.github/workflows/ci-core-api.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/core-api/**'
+      - 'packages/**'
+      - '.github/workflows/ci-core-api.yml'
+
+jobs:
+  lint-build-test:
+    name: Lint, Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm --filter @plantaviva/core-api lint
+
+      - name: Build
+        run: pnpm --filter @plantaviva/core-api build
+
+      - name: Test
+        run: pnpm --filter @plantaviva/core-api test
