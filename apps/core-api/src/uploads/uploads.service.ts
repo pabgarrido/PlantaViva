@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   BlobServiceClient,
   generateBlobSASQueryParameters,
@@ -15,20 +15,28 @@ export interface SasUrlResult {
 
 @Injectable()
 export class UploadsService {
+  private readonly logger = new Logger(UploadsService.name);
   private blobServiceClient: BlobServiceClient | null = null;
   private sharedKeyCredential: StorageSharedKeyCredential | null = null;
+  private accountName: string = '';
 
   constructor() {
     const connectionString = process.env['AZURE_STORAGE_CONNECTION_STRING'];
     if (connectionString) {
       this.blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-      // Parse account name and key for SAS generation
-      const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
+      this.accountName = connectionString.match(/AccountName=([^;]+)/)?.[1] ?? '';
       const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];
-      if (accountName && accountKey) {
-        this.sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+      if (this.accountName && accountKey) {
+        this.sharedKeyCredential = new StorageSharedKeyCredential(this.accountName, accountKey);
+        this.logger.log(`Storage connected: ${this.accountName}`);
       }
+    } else {
+      this.logger.warn('No AZURE_STORAGE_CONNECTION_STRING — uploads will fail');
     }
+  }
+
+  get storageConfigured(): boolean {
+    return !!this.blobServiceClient && !!this.sharedKeyCredential;
   }
 
   async generateSasUrl(
@@ -40,26 +48,19 @@ export class UploadsService {
     const blobName = `${projectId}/${Date.now()}-${filename}`;
 
     if (!this.blobServiceClient || !this.sharedKeyCredential) {
-      // Dev fallback — return a placeholder when no storage configured
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-      return {
-        uploadUrl: `https://localhost/devstore/${containerName}/${blobName}?dev=true`,
-        blobName,
-        expiresAt,
-      };
+      throw new Error('Storage not configured — set AZURE_STORAGE_CONNECTION_STRING');
     }
 
     const containerClient = this.blobServiceClient.getContainerClient(containerName);
     const blobClient = containerClient.getBlobClient(blobName);
 
-    const expiresOn = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+    const expiresOn = new Date(Date.now() + 15 * 60 * 1000);
     const sasToken = generateBlobSASQueryParameters(
       {
         containerName,
         blobName,
-        permissions: BlobSASPermissions.parse('cw'), // create + write
+        permissions: BlobSASPermissions.parse('cw'),
         expiresOn,
-        protocol: SASProtocol.Https,
         contentType: this.mimeType(fileType),
       },
       this.sharedKeyCredential,
@@ -70,6 +71,20 @@ export class UploadsService {
       blobName,
       expiresAt: expiresOn.toISOString(),
     };
+  }
+
+  /** Download a blob's content as Buffer */
+  async downloadBlob(containerName: string, blobName: string): Promise<Buffer> {
+    if (!this.blobServiceClient) throw new Error('Storage not configured');
+    const client = this.blobServiceClient.getContainerClient(containerName).getBlobClient(blobName);
+    const download = await client.download(0);
+    const chunks: Buffer[] = [];
+    if (download.readableStreamBody) {
+      for await (const chunk of download.readableStreamBody) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+    }
+    return Buffer.concat(chunks);
   }
 
   private mimeType(fileType: string): string {

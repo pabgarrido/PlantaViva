@@ -54,10 +54,26 @@ export default function ProjectPage() {
     }
 
     setUploading(true);
-    setUploadProgress('A processar ficheiro...');
+    setUploadProgress('A obter URL de upload...');
     try {
       const sas = await api.uploads.requestSas(projectId, file.name, ext, file.size);
-      setUploadProgress('A gerar modelo 3D...');
+
+      // Real upload to Blob Storage (Azurite or Azure)
+      setUploadProgress('A carregar para o armazenamento...');
+      const uploadRes = await fetch(sas.uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'x-ms-blob-type': 'BlockBlob',
+          'Content-Type': file.type || 'application/octet-stream',
+        },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Upload falhou: ${uploadRes.status} ${uploadRes.statusText}`);
+      }
+
+      setUploadProgress('A analisar planta...');
       await api.uploads.complete(projectId, sas.blobName, ext);
 
       const [updatedProject, updatedScene] = await Promise.all([

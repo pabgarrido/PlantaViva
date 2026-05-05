@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { SceneGraph, SceneWall, SceneRoom, SceneOpening, FileType } from '@plantaviva/types';
+import { JsonStore } from '../common/json-store';
 
 @Injectable()
 export class SceneService {
-  private scenes: Map<string, SceneGraph> = new Map();
+  private scenes = new JsonStore<SceneGraph>('scenes');
 
   get(projectId: string): SceneGraph | null {
     return this.scenes.get(projectId) ?? null;

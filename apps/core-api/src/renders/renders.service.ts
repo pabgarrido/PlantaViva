@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { RenderJob, RenderTier, RenderStatus } from '@plantaviva/types';
+import { JsonStore } from '../common/json-store';
 
 @Injectable()
 export class RendersService {
-  private jobs: Map<string, RenderJob> = new Map();
+  private jobs = new JsonStore<RenderJob>('renders');
 
   create(projectId: string, tier: RenderTier, cameraId?: string, resolution?: string): RenderJob {
     const now = new Date().toISOString();
@@ -27,7 +28,7 @@ export class RendersService {
   }
 
   findByProject(projectId: string): RenderJob[] {
-    return Array.from(this.jobs.values())
+    return this.jobs.values()
       .filter(j => j.projectId === projectId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }

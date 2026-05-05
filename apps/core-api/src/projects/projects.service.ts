@@ -2,11 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { Project, ProjectStatus } from '@plantaviva/types';
 import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto';
+import { JsonStore } from '../common/json-store';
 
 @Injectable()
 export class ProjectsService {
-  // In-memory store — replaced with Azure SQL in Phase 2
-  private projects: Map<string, Project> = new Map();
+  private projects = new JsonStore<Project>('projects');
 
   create(ownerId: string, dto: CreateProjectDto): Project {
     const now = new Date().toISOString();
@@ -24,7 +24,7 @@ export class ProjectsService {
   }
 
   findAllByOwner(ownerId: string): Project[] {
-    return Array.from(this.projects.values()).filter((p) => p.ownerId === ownerId);
+    return this.projects.values().filter((p) => p.ownerId === ownerId);
   }
 
   findOne(id: string, ownerId: string): Project {
@@ -45,7 +45,7 @@ export class ProjectsService {
   }
 
   remove(id: string, ownerId: string): void {
-    this.findOne(id, ownerId); // throws if not found
+    this.findOne(id, ownerId);
     this.projects.delete(id);
   }
 

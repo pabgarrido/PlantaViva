@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import * as dotenv from 'dotenv';
+dotenv.config();
 // Application Insights must be initialized before importing other modules
 import './telemetry';
 import { NestFactory } from '@nestjs/core';
