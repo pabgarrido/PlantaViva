@@ -7,6 +7,12 @@ dist/
 .next/
 out/
 build/
+*.js.map
+*.d.ts.map
+
+# Compiled TypeScript in source dirs (NestJS watch mode)
+apps/*/src/**/*.js
+apps/*/src/**/*.d.ts
 *.pyc
 __pycache__/
 .pytest_cache/
