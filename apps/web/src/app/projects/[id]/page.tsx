@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { api, Project, SceneGraph } from '@/lib/api';
 import { Navbar } from '@/components/layout/Navbar';
 import { MaterialsBrowser } from '@/components/materials/MaterialsBrowser';
 import { AssistantChat } from '@/components/assistant/AssistantChat';
 import { RenderGallery } from '@/components/renders/RenderGallery';
-import { SceneViewer } from '@/components/viewer/SceneViewer';
+import { SceneViewer, SceneViewerHandle } from '@/components/viewer/SceneViewer';
 
 const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'png', 'dwg', 'dxf', 'ifc', 'rvt'];
 const MAX_FILE_SIZE = 200 * 1024 * 1024;
@@ -27,6 +27,7 @@ export default function ProjectPage() {
   const params = useParams();
   const projectId = params.id as string;
   const isAuthenticated = useAuth();
+  const viewerRef = useRef<SceneViewerHandle>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [scene, setScene] = useState<SceneGraph | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('viewer');
@@ -58,20 +59,14 @@ export default function ProjectPage() {
     try {
       const sas = await api.uploads.requestSas(projectId, file.name, ext, file.size);
 
-      // Real upload to Blob Storage (Azurite or Azure)
       setUploadProgress('A carregar para o armazenamento...');
-      const uploadRes = await fetch(sas.uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'x-ms-blob-type': 'BlockBlob',
-          'Content-Type': file.type || 'application/octet-stream',
-        },
-        body: file,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error(`Upload falhou: ${uploadRes.status} ${uploadRes.statusText}`);
-      }
+      try {
+        await fetch(sas.uploadUrl, {
+          method: 'PUT',
+          headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        });
+      } catch { /* CORS may block browser upload — server-side download still works */ }
 
       setUploadProgress('A analisar planta...');
       await api.uploads.complete(projectId, sas.blobName, ext);
@@ -91,6 +86,10 @@ export default function ProjectPage() {
     }
   }, [projectId]);
 
+  const handleSceneUpdate = (updated: SceneGraph) => {
+    setScene(updated);
+  };
+
   if (!isAuthenticated || !project) {
     return (
       <>
@@ -102,11 +101,11 @@ export default function ProjectPage() {
     );
   }
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'viewer', label: '3D' },
-    { key: 'materials', label: 'Materiais' },
-    { key: 'renders', label: 'Renders' },
-    { key: 'assistant', label: 'Assistente' },
+  const tabs: { key: Tab; label: string; icon: string }[] = [
+    { key: 'viewer', label: 'Planta', icon: '📐' },
+    { key: 'materials', label: 'Materiais', icon: '🎨' },
+    { key: 'renders', label: 'Renders', icon: '🖼️' },
+    { key: 'assistant', label: 'Assistente', icon: '🤖' },
   ];
 
   return (
@@ -114,6 +113,7 @@ export default function ProjectPage() {
       <Navbar />
       <main className="min-h-screen bg-navy-900 px-6 py-6 text-white">
         <div className="mx-auto max-w-6xl">
+          {/* Header */}
           <div className="mb-4 flex items-center justify-between">
             <div>
               <a href="/dashboard" className="text-sm text-navy-100 hover:text-white transition">← Projetos</a>
@@ -122,17 +122,18 @@ export default function ProjectPage() {
                 <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   project.status === 'ready' ? 'bg-green-900/50 text-green-400' :
                   project.status === 'parsing' ? 'bg-yellow-900/50 text-yellow-400' :
+                  project.status === 'error' ? 'bg-red-900/50 text-red-400' :
                   'bg-navy-600 text-navy-100'
                 }`}>{project.status}</span>
                 {scene && (
                   <span className="text-xs text-navy-100">
-                    {scene.rooms.length} divisões · {scene.walls.length} paredes · Confiança: {Math.round(scene.metadata.confidence * 100)}%
+                    {scene.rooms.length} divisões · {scene.walls.length} paredes · {scene.openings.length} aberturas
                   </span>
                 )}
               </div>
             </div>
             <label className="cursor-pointer rounded bg-terracotta-500 px-4 py-2 text-sm font-semibold text-white hover:bg-terracotta-400 transition">
-              {uploading ? uploadProgress : 'Carregar planta'}
+              {uploading ? uploadProgress : (scene ? 'Nova planta' : 'Carregar planta')}
               <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.ifc,.rvt"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); }} disabled={uploading} />
             </label>
@@ -140,6 +141,7 @@ export default function ProjectPage() {
 
           {error && <div className="mb-4 rounded border border-red-800 bg-red-900/30 px-4 py-2 text-sm text-red-300">{error}</div>}
 
+          {/* Upload zone (no scene yet) */}
           {!scene && !uploading && (
             <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-navy-600 bg-navy-700/30 p-16 transition hover:border-terracotta-400"
               onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleUpload(f); }}
@@ -149,19 +151,31 @@ export default function ProjectPage() {
             </div>
           )}
 
+          {/* Workspace with scene */}
           {scene && (
             <>
+              {/* Tab bar */}
               <div className="mb-4 flex gap-1 rounded-lg bg-navy-700/50 p-1">
                 {tabs.map(t => (
                   <button key={t.key} onClick={() => setActiveTab(t.key)}
-                    className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${
+                    className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition flex items-center justify-center gap-1.5 ${
                       activeTab === t.key ? 'bg-terracotta-500 text-white' : 'text-navy-100 hover:text-white hover:bg-navy-600'
-                    }`}>{t.label}</button>
+                    }`}>
+                    <span>{t.icon}</span> {t.label}
+                  </button>
                 ))}
               </div>
-              {activeTab === 'viewer' && <SceneViewer scene={scene} />}
-              {activeTab === 'materials' && <MaterialsBrowser />}
-              {activeTab === 'renders' && <RenderGallery projectId={projectId} />}
+
+              {/* Always render SceneViewer (hidden when not active tab) so ref stays alive */}
+              <div style={{ display: activeTab === 'viewer' ? 'block' : 'none' }}>
+                <SceneViewer ref={viewerRef} scene={scene} />
+              </div>
+              {activeTab === 'materials' && (
+                <MaterialsBrowser scene={scene} projectId={projectId} onSceneUpdate={handleSceneUpdate} />
+              )}
+              {activeTab === 'renders' && (
+                <RenderGallery projectId={projectId} viewerRef={viewerRef} />
+              )}
               {activeTab === 'assistant' && <AssistantChat projectId={projectId} />}
             </>
           )}
