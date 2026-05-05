@@ -38,6 +38,54 @@ export interface SasUrlResult {
   expiresAt: string;
 }
 
+export interface SceneGraph {
+  schemaVersion: string;
+  units: string;
+  rooms: Array<{ id: string; name: string; polygon: [number, number][]; ceilingHeight: number; floor?: string }>;
+  walls: Array<{ id: string; from: [number, number]; to: [number, number]; thickness: number; height: number; openings: SceneOpening[] }>;
+  openings: SceneOpening[];
+  metadata: { parsedFrom: string; confidence: number; needsReview: boolean };
+}
+
+export interface SceneOpening {
+  id: string;
+  type: 'door' | 'window';
+  wallId: string;
+  position: number;
+  width: number;
+  height: number;
+}
+
+export interface Material {
+  id: string;
+  slug: string;
+  namePt: string;
+  nameEs: string;
+  nameEn: string;
+  category: string;
+  supplier?: string;
+  tags: string[];
+  pbrMaps: Record<string, string | undefined>;
+}
+
+export interface RenderJob {
+  id: string;
+  projectId: string;
+  tier: string;
+  status: string;
+  resolution?: string;
+  resultUrl?: string;
+  gpuSeconds?: number;
+  estimatedCostEur?: number;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface AssistantResponse {
+  reply: string;
+  actions: Array<{ tool: string; args: Record<string, unknown> }>;
+}
+
 export const api = {
   projects: {
     list: () => apiFetch<Project[]>('/projects'),
@@ -54,9 +102,40 @@ export const api = {
         body: JSON.stringify({ filename, fileType, fileSize }),
       }),
     complete: (projectId: string, blobName: string, fileType: string) =>
-      apiFetch<{ status: string }>(`/projects/${encodeURIComponent(projectId)}/uploads/complete`, {
+      apiFetch<{ status: string; scene?: SceneGraph }>(`/projects/${encodeURIComponent(projectId)}/uploads/complete`, {
         method: 'POST',
         body: JSON.stringify({ blobName, fileType }),
       }),
+  },
+  scene: {
+    get: (projectId: string) => apiFetch<SceneGraph>(`/projects/${encodeURIComponent(projectId)}/scene`),
+    patch: (projectId: string, data: Partial<SceneGraph>) =>
+      apiFetch<SceneGraph>(`/projects/${encodeURIComponent(projectId)}/scene`, { method: 'PATCH', body: JSON.stringify(data) }),
+    regenerate: (projectId: string) =>
+      apiFetch<SceneGraph>(`/projects/${encodeURIComponent(projectId)}/scene/regenerate`, { method: 'POST' }),
+  },
+  materials: {
+    list: (params?: { category?: string; supplier?: string; q?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.category) qs.set('category', params.category);
+      if (params?.supplier) qs.set('supplier', params.supplier);
+      if (params?.q) qs.set('q', params.q);
+      const query = qs.toString();
+      return apiFetch<Material[]>(`/materials${query ? `?${query}` : ''}`);
+    },
+    categories: () => apiFetch<string[]>('/materials/categories'),
+    suppliers: () => apiFetch<string[]>('/materials/suppliers'),
+  },
+  renders: {
+    create: (projectId: string, tier: string) =>
+      apiFetch<RenderJob>(`/projects/${encodeURIComponent(projectId)}/renders`, { method: 'POST', body: JSON.stringify({ tier }) }),
+    list: (projectId: string) => apiFetch<RenderJob[]>(`/projects/${encodeURIComponent(projectId)}/renders`),
+    get: (id: string) => apiFetch<RenderJob>(`/renders/${encodeURIComponent(id)}`),
+  },
+  assistant: {
+    chat: (projectId: string, message: string) =>
+      apiFetch<AssistantResponse>(`/projects/${encodeURIComponent(projectId)}/assistant`, { method: 'POST', body: JSON.stringify({ message }) }),
+    history: (projectId: string) =>
+      apiFetch<Array<{ role: string; content: string }>>(`/projects/${encodeURIComponent(projectId)}/assistant/history`),
   },
 };

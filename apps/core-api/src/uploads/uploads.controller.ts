@@ -3,7 +3,9 @@ import { B2CAuthGuard } from '../auth/b2c-auth.guard';
 import { CurrentUser, AuthUser } from '../auth/current-user.decorator';
 import { UploadsService } from './uploads.service';
 import { ProjectsService } from '../projects/projects.service';
+import { SceneService } from '../scene/scene.service';
 import { RequestSasDto } from './dto/upload.dto';
+import type { FileType } from '@plantaviva/types';
 
 @Controller('projects/:projectId/uploads')
 @UseGuards(B2CAuthGuard)
@@ -11,6 +13,7 @@ export class UploadsController {
   constructor(
     private readonly uploadsService: UploadsService,
     private readonly projectsService: ProjectsService,
+    private readonly sceneService: SceneService,
   ) {}
 
   @Post('sas')
@@ -19,16 +22,8 @@ export class UploadsController {
     @Param('projectId') projectId: string,
     @Body() dto: RequestSasDto,
   ) {
-    // Verify project ownership
     this.projectsService.findOne(projectId, user.sub);
-
-    const result = await this.uploadsService.generateSasUrl(
-      projectId,
-      dto.filename,
-      dto.fileType,
-    );
-
-    return result;
+    return this.uploadsService.generateSasUrl(projectId, dto.filename, dto.fileType);
   }
 
   @Post('complete')
@@ -37,16 +32,15 @@ export class UploadsController {
     @Param('projectId') projectId: string,
     @Body() body: { blobName: string; fileType: string },
   ) {
-    // Verify project ownership
     this.projectsService.findOne(projectId, user.sub);
-
-    // Update project status to 'uploading'
     this.projectsService.updateStatus(projectId, 'uploading');
 
-    // TODO Phase 2: Publish parse job to Service Bus based on fileType
-    // For now, transition straight to 'ready'
+    // In prod: publish to Service Bus → parser-worker processes file
+    // In dev: generate demo scene inline
+    this.projectsService.updateStatus(projectId, 'parsing');
+    const scene = this.sceneService.generateDemo(projectId, body.fileType as FileType);
     this.projectsService.updateStatus(projectId, 'ready');
 
-    return { status: 'ok', projectId, blobName: body.blobName };
+    return { status: 'ok', projectId, blobName: body.blobName, scene };
   }
 }
