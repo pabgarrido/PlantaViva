@@ -1,12 +1,23 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useIsAuthenticated } from '@azure/msal-react';
 import { api, Project } from '@/lib/api';
 import { Navbar } from '@/components/layout/Navbar';
 
+const b2cConfigured = !!process.env['NEXT_PUBLIC_ENTRA_B2C_CLIENT_ID'];
+
+function useAuth() {
+  if (!b2cConfigured) return true;
+  try {
+    const { useIsAuthenticated } = require('@azure/msal-react');
+    return useIsAuthenticated();
+  } catch {
+    return true;
+  }
+}
+
 export default function DashboardPage() {
-  const isAuthenticated = useIsAuthenticated();
+  const isAuthenticated = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(false);

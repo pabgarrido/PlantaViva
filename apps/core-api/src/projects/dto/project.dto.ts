@@ -2,18 +2,18 @@ import { IsString, IsOptional, MaxLength, ValidateNested } from 'class-validator
 import { Type } from 'class-transformer';
 
 class LocationDto {
-  lat: number;
-  lng: number;
+  lat!: number;
+  lng!: number;
 
   @IsString()
   @MaxLength(255)
-  label: string;
+  label!: string;
 }
 
 export class CreateProjectDto {
   @IsString()
   @MaxLength(255)
-  name: string;
+  name!: string;
 
   @IsOptional()
   @ValidateNested()

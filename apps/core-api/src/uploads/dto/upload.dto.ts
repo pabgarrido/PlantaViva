@@ -5,13 +5,13 @@ const ALLOWED_EXTENSIONS: FileType[] = ['pdf', 'jpg', 'png', 'dwg', 'dxf', 'ifc'
 
 export class RequestSasDto {
   @IsString()
-  filename: string;
+  filename!: string;
 
   @IsIn(ALLOWED_EXTENSIONS)
-  fileType: FileType;
+  fileType!: FileType;
 
   @IsInt()
   @Min(1)
   @Max(209715200) // 200MB
-  fileSize: number;
+  fileSize!: number;
 }

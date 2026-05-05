@@ -1,24 +1,41 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
-import * as jwt from 'jsonwebtoken';
-import * as jwksRsa from 'jwks-rsa';
+import jwt from 'jsonwebtoken';
+import jwksRsa from 'jwks-rsa';
+
+const DEV_USER = {
+  sub: 'dev-user-00000000',
+  email: 'dev@plantaviva.pt',
+  name: 'Dev Architect',
+};
 
 @Injectable()
 export class B2CAuthGuard implements CanActivate {
-  private jwksClient: jwksRsa.JwksClient;
+  private jwksClient: jwksRsa.JwksClient | null = null;
+  private b2cConfigured: boolean;
 
   constructor() {
     const tenant = process.env['AZURE_B2C_TENANT'] ?? '';
-    const policy = process.env['AZURE_B2C_POLICY'] ?? 'B2C_1_signup_signin';
-    this.jwksClient = jwksRsa({
-      jwksUri: `https://${tenant}.b2clogin.com/${tenant}.onmicrosoft.com/${policy}/discovery/v2.0/keys`,
-      cache: true,
-      cacheMaxAge: 600000,
-    });
+    this.b2cConfigured = !!tenant;
+    if (this.b2cConfigured) {
+      const policy = process.env['AZURE_B2C_POLICY'] ?? 'B2C_1_signup_signin';
+      this.jwksClient = jwksRsa({
+        jwksUri: `https://${tenant}.b2clogin.com/${tenant}.onmicrosoft.com/${policy}/discovery/v2.0/keys`,
+        cache: true,
+        cacheMaxAge: 600000,
+      });
+    }
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
+
+    // Dev mode — no B2C configured, allow all requests with a synthetic user
+    if (!this.b2cConfigured) {
+      (request as any).user = DEV_USER;
+      return true;
+    }
+
     const authHeader = request.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing or invalid Authorization header');
@@ -31,7 +48,7 @@ export class B2CAuthGuard implements CanActivate {
         throw new UnauthorizedException('Invalid token');
       }
 
-      const key = await this.jwksClient.getSigningKey(decoded.header.kid);
+      const key = await this.jwksClient!.getSigningKey(decoded.header.kid);
       const signingKey = key.getPublicKey();
 
       const audience = process.env['AZURE_B2C_CLIENT_ID'] ?? '';

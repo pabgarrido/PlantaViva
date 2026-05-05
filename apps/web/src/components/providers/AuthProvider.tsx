@@ -4,11 +4,15 @@ import { MsalProvider } from '@azure/msal-react';
 import { msalInstance } from '@/lib/msal';
 import { ReactNode, useEffect, useState } from 'react';
 
+const b2cConfigured = !!process.env['NEXT_PUBLIC_ENTRA_B2C_CLIENT_ID'];
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(!b2cConfigured);
 
   useEffect(() => {
-    msalInstance.initialize().then(() => setReady(true));
+    if (b2cConfigured) {
+      msalInstance.initialize().then(() => setReady(true)).catch(() => setReady(true));
+    }
   }, []);
 
   if (!ready) {
@@ -17,6 +21,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         <p>A carregar...</p>
       </div>
     );
+  }
+
+  if (!b2cConfigured) {
+    return <>{children}</>;
   }
 
   return <MsalProvider instance={msalInstance}>{children}</MsalProvider>;

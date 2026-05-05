@@ -2,17 +2,27 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { useIsAuthenticated } from '@azure/msal-react';
 import { api, Project } from '@/lib/api';
 import { Navbar } from '@/components/layout/Navbar';
 
 const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'png', 'dwg', 'dxf', 'ifc', 'rvt'];
 const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB
+const b2cConfigured = !!process.env['NEXT_PUBLIC_ENTRA_B2C_CLIENT_ID'];
+
+function useAuth() {
+  if (!b2cConfigured) return true;
+  try {
+    const { useIsAuthenticated } = require('@azure/msal-react');
+    return useIsAuthenticated();
+  } catch {
+    return true;
+  }
+}
 
 export default function ProjectPage() {
   const params = useParams();
   const projectId = params.id as string;
-  const isAuthenticated = useIsAuthenticated();
+  const isAuthenticated = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);

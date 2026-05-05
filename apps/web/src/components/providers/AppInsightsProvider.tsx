@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import {
   ApplicationInsights,
   type IConfiguration,
-} from '@applicationinsights/web';
+} from '@microsoft/applicationinsights-web';
 
 let appInsights: ApplicationInsights | null = null;
 

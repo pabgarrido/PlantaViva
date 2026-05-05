@@ -13,9 +13,9 @@
     "next": "15.1.6",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "@applicationinsights/web": "^3.3.4",
-    "@azure/msal-browser": "^3.27.0",
-    "@azure/msal-react": "^2.1.1",
+    "@microsoft/applicationinsights-web": "^3.3.4",
+    "@azure/msal-browser": "^4.8.0",
+    "@azure/msal-react": "^3.0.0",
     "@plantaviva/types": "workspace:*"
   },
   "devDependencies": {
