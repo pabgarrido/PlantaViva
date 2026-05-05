@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from .telemetry import setup_telemetry
 from .routers import health
+from .routers import parse
 
 
 @asynccontextmanager
@@ -18,11 +19,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
 
 app = FastAPI(
     title="PlantaViva Parser Worker",
-    version="0.0.1",
+    version="0.1.0",
     lifespan=lifespan,
 )
 
 app.include_router(health.router)
+app.include_router(parse.router)
 
 
 @app.get("/")

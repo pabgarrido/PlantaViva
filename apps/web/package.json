@@ -13,7 +13,12 @@
     "next": "15.1.6",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "@applicationinsights/web": "^3.3.4",
+    "@microsoft/applicationinsights-web": "^3.3.4",
+    "@azure/msal-browser": "^4.8.0",
+    "@azure/msal-react": "^3.0.0",
+    "@react-three/fiber": "^8.17.0",
+    "@react-three/drei": "^9.117.0",
+    "three": "^0.170.0",
     "@plantaviva/types": "workspace:*"
   },
   "devDependencies": {
@@ -21,6 +26,7 @@
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.4",
     "@types/react-dom": "^19.0.2",
+    "@types/three": "^0.170.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",

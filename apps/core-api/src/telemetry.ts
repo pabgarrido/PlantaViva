@@ -7,7 +7,7 @@ if (connectionString) {
     .setup(connectionString)
     .setAutoDependencyCorrelation(true)
     .setAutoCollectRequests(true)
-    .setAutoCollectPerformance(true)
+    .setAutoCollectPerformance(true, false)
     .setAutoCollectExceptions(true)
     .setAutoCollectDependencies(true)
     .setAutoCollectConsole(true)
