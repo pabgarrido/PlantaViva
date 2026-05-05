@@ -16,6 +16,7 @@
     "@nestjs/platform-express": "^10.4.15",
     "@nestjs/terminus": "^10.2.3",
     "@azure/storage-blob": "^12.24.0",
+    "@azure/identity": "^4.5.0",
     "openai": "^4.73.0",
     "dotenv": "^16.4.7",
     "applicationinsights": "^3.4.0",

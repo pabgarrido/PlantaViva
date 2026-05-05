@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AzureOpenAI } from 'openai';
+import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';
 
 export interface AssistantMessage {
   role: 'user' | 'assistant' | 'system';
@@ -46,14 +47,30 @@ export class AssistantService {
     this.deployment = process.env['AZURE_OPENAI_DEPLOYMENT'] ?? 'gpt-4o';
 
     if (endpoint && apiKey) {
+      // API key auth
       this.openai = new AzureOpenAI({
         endpoint,
         apiKey,
         apiVersion: '2024-10-21',
       });
-      this.logger.log(`Azure OpenAI connected: ${endpoint} (${this.deployment})`);
+      this.logger.log(`Azure OpenAI connected (API key): ${endpoint} (${this.deployment})`);
+    } else if (endpoint) {
+      // Entra ID token auth (when local auth is disabled)
+      try {
+        const credential = new DefaultAzureCredential();
+        const scope = 'https://cognitiveservices.azure.com/.default';
+        const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+        this.openai = new AzureOpenAI({
+          endpoint,
+          azureADTokenProvider,
+          apiVersion: '2024-10-21',
+        });
+        this.logger.log(`Azure OpenAI connected (Entra ID): ${endpoint} (${this.deployment})`);
+      } catch (err: any) {
+        this.logger.error(`Failed to initialize Entra ID auth: ${err.message}`);
+      }
     } else {
-      this.logger.warn('No AZURE_OPENAI_ENDPOINT/KEY — using pattern-match fallback');
+      this.logger.warn('No AZURE_OPENAI_ENDPOINT — using pattern-match fallback');
     }
   }
 
