@@ -1,147 +1,164 @@
 'use client';
 
-import { useRef, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Line, Text } from '@react-three/drei';
+import { useRef, useEffect, useState } from 'react';
 import type { SceneGraph } from '@/lib/api';
-import * as THREE from 'three';
 
-function Wall({ from, to, height, thickness }: { from: [number,number]; to: [number,number]; height: number; thickness: number }) {
-  const dx = to[0] - from[0];
-  const dz = to[1] - from[1];
-  const length = Math.sqrt(dx * dx + dz * dz);
-  const angle = Math.atan2(dz, dx);
-  const cx = (from[0] + to[0]) / 2;
-  const cz = (from[1] + to[1]) / 2;
+const SCALE = 50; // px per meter
+const PADDING = 40;
 
-  return (
-    <mesh position={[cx, height / 2, cz]} rotation={[0, -angle, 0]}>
-      <boxGeometry args={[length, height, thickness]} />
-      <meshStandardMaterial color="#e8e0d4" transparent opacity={0.85} />
-    </mesh>
-  );
-}
+function drawScene(ctx: CanvasRenderingContext2D, scene: SceneGraph, width: number, height: number) {
+  ctx.clearRect(0, 0, width, height);
 
-function Floor({ polygon, y = 0, color = '#c4a882' }: { polygon: [number,number][]; y?: number; color?: string }) {
-  const shape = useMemo(() => {
-    const s = new THREE.Shape();
-    s.moveTo(polygon[0][0], polygon[0][1]);
-    for (let i = 1; i < polygon.length; i++) {
-      s.lineTo(polygon[i][0], polygon[i][1]);
-    }
-    s.closePath();
-    return s;
-  }, [polygon]);
+  // Background
+  ctx.fillStyle = '#f5f0e8';
+  ctx.fillRect(0, 0, width, height);
 
-  return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]}>
-      <shapeGeometry args={[shape]} />
-      <meshStandardMaterial color={color} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
+  const ox = PADDING;
+  const oy = PADDING;
 
-function RoomLabel({ name, polygon, height }: { name: string; polygon: [number,number][]; height: number }) {
-  const cx = polygon.reduce((s, p) => s + p[0], 0) / polygon.length;
-  const cz = polygon.reduce((s, p) => s + p[1], 0) / polygon.length;
-  return (
-    <Text position={[cx, height * 0.6, cz]} fontSize={0.3} color="#4a3520" anchorX="center" anchorY="middle">
-      {name}
-    </Text>
-  );
-}
-
-function Opening({ type, wall, position, width, height: h }: {
-  type: 'door' | 'window';
-  wall: { from: [number,number]; to: [number,number] };
-  position: number;
-  width: number;
-  height: number;
-}) {
-  const dx = wall.to[0] - wall.from[0];
-  const dz = wall.to[1] - wall.from[1];
-  const length = Math.sqrt(dx * dx + dz * dz);
-  const angle = Math.atan2(dz, dx);
-  const ox = wall.from[0] + dx * position;
-  const oz = wall.from[1] + dz * position;
-  const yOff = type === 'window' ? 1.0 : 0;
-
-  return (
-    <mesh position={[ox, yOff + h / 2, oz]} rotation={[0, -angle, 0]}>
-      <boxGeometry args={[width, h, 0.2]} />
-      <meshStandardMaterial color={type === 'window' ? '#a8d4e6' : '#8b6914'} transparent opacity={type === 'window' ? 0.4 : 0.8} />
-    </mesh>
-  );
-}
-
-function SceneContent({ scene }: { scene: SceneGraph }) {
+  // Floor colors
   const floorColors: Record<string, string> = {
-    wood_oak_01: '#c4a060',
+    wood_oak_01: '#d4b896',
     tile_white_01: '#e8e8e8',
     tile_marble_01: '#f0ebe3',
-    default: '#c4a882',
   };
 
-  return (
-    <>
-      {/* Floors */}
-      {scene.rooms.map(room => (
-        <Floor
-          key={room.id}
-          polygon={room.polygon}
-          color={floorColors[room.floor ?? 'default'] ?? floorColors.default}
-        />
-      ))}
+  // Draw rooms
+  scene.rooms.forEach(room => {
+    const poly = room.polygon;
+    ctx.beginPath();
+    ctx.moveTo(ox + poly[0][0] * SCALE, oy + poly[0][1] * SCALE);
+    for (let i = 1; i < poly.length; i++) {
+      ctx.lineTo(ox + poly[i][0] * SCALE, oy + poly[i][1] * SCALE);
+    }
+    ctx.closePath();
+    ctx.fillStyle = floorColors[room.floor ?? ''] ?? '#e8ddd0';
+    ctx.fill();
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
 
-      {/* Walls */}
-      {scene.walls.map(wall => (
-        <Wall key={wall.id} from={wall.from} to={wall.to} height={wall.height} thickness={wall.thickness} />
-      ))}
+    // Room label
+    const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length;
+    const cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
+    ctx.fillStyle = '#5a4a3a';
+    ctx.font = 'bold 12px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(room.name, ox + cx * SCALE, oy + cy * SCALE - 4);
+    ctx.font = '10px Inter, sans-serif';
+    ctx.fillStyle = '#8a7a6a';
+    ctx.fillText(`${room.ceilingHeight}m`, ox + cx * SCALE, oy + cy * SCALE + 10);
+  });
 
-      {/* Openings */}
-      {scene.openings.map(opening => {
-        const wall = scene.walls.find(w => w.id === opening.wallId);
-        if (!wall) return null;
-        return (
-          <Opening
-            key={opening.id}
-            type={opening.type}
-            wall={wall}
-            position={opening.position}
-            width={opening.width}
-            height={opening.height}
-          />
-        );
-      })}
+  // Draw walls
+  ctx.strokeStyle = '#3a3020';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  scene.walls.forEach(wall => {
+    ctx.beginPath();
+    ctx.moveTo(ox + wall.from[0] * SCALE, oy + wall.from[1] * SCALE);
+    ctx.lineTo(ox + wall.to[0] * SCALE, oy + wall.to[1] * SCALE);
+    ctx.stroke();
+  });
 
-      {/* Room labels */}
-      {scene.rooms.map(room => (
-        <RoomLabel key={`label-${room.id}`} name={room.name} polygon={room.polygon} height={room.ceilingHeight} />
-      ))}
-    </>
+  // Draw openings
+  scene.openings.forEach(opening => {
+    const wall = scene.walls.find(w => w.id === opening.wallId);
+    if (!wall) return;
+    const dx = wall.to[0] - wall.from[0];
+    const dy = wall.to[1] - wall.from[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const px = wall.from[0] + dx * opening.position;
+    const py = wall.from[1] + dy * opening.position;
+    const hw = (opening.width / 2) / len;
+
+    if (opening.type === 'door') {
+      // Draw door as gap + arc
+      ctx.strokeStyle = '#f5f0e8';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(ox + (px - dx * hw) * SCALE, oy + (py - dy * hw) * SCALE);
+      ctx.lineTo(ox + (px + dx * hw) * SCALE, oy + (py + dy * hw) * SCALE);
+      ctx.stroke();
+
+      // Door arc
+      ctx.strokeStyle = '#8b6914';
+      ctx.lineWidth = 1;
+      const angle = Math.atan2(dy, dx);
+      ctx.beginPath();
+      ctx.arc(ox + (px - dx * hw) * SCALE, oy + (py - dy * hw) * SCALE, opening.width * SCALE * 0.9, angle, angle + Math.PI / 2);
+      ctx.stroke();
+    } else {
+      // Window as double line
+      ctx.strokeStyle = '#f5f0e8';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(ox + (px - dx * hw) * SCALE, oy + (py - dy * hw) * SCALE);
+      ctx.lineTo(ox + (px + dx * hw) * SCALE, oy + (py + dy * hw) * SCALE);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#5ba8d4';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ox + (px - dx * hw) * SCALE, oy + (py - dy * hw) * SCALE);
+      ctx.lineTo(ox + (px + dx * hw) * SCALE, oy + (py + dy * hw) * SCALE);
+      ctx.stroke();
+    }
+  });
+
+  // Metadata badge
+  ctx.fillStyle = 'rgba(30,58,95,0.85)';
+  const badgeW = 200, badgeH = 28;
+  ctx.fillRect(width - badgeW - 10, height - badgeH - 10, badgeW, badgeH);
+  ctx.fillStyle = '#fff';
+  ctx.font = '11px Inter, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(
+    `${scene.rooms.length} divisões · ${scene.walls.length} paredes · ${Math.round(scene.metadata.confidence * 100)}% confiança`,
+    width - 18, height - 19
   );
 }
 
 export function SceneViewer({ scene }: { scene: SceneGraph }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [is3D, setIs3D] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Calculate canvas size from scene bounds
+    let maxX = 0, maxY = 0;
+    scene.walls.forEach(w => {
+      maxX = Math.max(maxX, w.from[0], w.to[0]);
+      maxY = Math.max(maxY, w.from[1], w.to[1]);
+    });
+    const cw = maxX * SCALE + PADDING * 2;
+    const ch = maxY * SCALE + PADDING * 2;
+    canvas.width = cw;
+    canvas.height = ch;
+    canvas.style.width = '100%';
+    canvas.style.height = 'auto';
+
+    drawScene(ctx, scene, cw, ch);
+  }, [scene]);
+
   return (
-    <div className="h-[500px] w-full rounded-lg overflow-hidden border border-navy-700 bg-gradient-to-b from-sky-200 to-sky-50">
-      <Canvas shadows>
-        <PerspectiveCamera makeDefault position={[12, 10, 12]} fov={50} />
-        <OrbitControls target={[5.5, 0, 3.75]} maxPolarAngle={Math.PI / 2.1} />
-
-        {/* Lighting */}
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[10, 15, 8]} intensity={1.2} castShadow />
-        <directionalLight position={[-5, 8, -3]} intensity={0.3} />
-
-        {/* Ground plane */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[5.5, -0.01, 3.75]} receiveShadow>
-          <planeGeometry args={[20, 20]} />
-          <meshStandardMaterial color="#7cb37c" />
-        </mesh>
-
-        <SceneContent scene={scene} />
-      </Canvas>
+    <div className="rounded-lg border border-navy-700 bg-navy-700/30 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Planta — Vista {is3D ? '3D' : '2D'}</h3>
+        <button
+          onClick={() => setIs3D(prev => !prev)}
+          className="rounded bg-navy-600 px-3 py-1 text-xs text-navy-100 hover:bg-navy-500 transition"
+        >
+          {is3D ? 'Vista 2D' : 'Vista 3D'}
+        </button>
+      </div>
+      <div className="overflow-auto rounded bg-[#f5f0e8]" style={{ maxHeight: '500px' }}>
+        <canvas ref={canvasRef} className="mx-auto" />
+      </div>
     </div>
   );
 }

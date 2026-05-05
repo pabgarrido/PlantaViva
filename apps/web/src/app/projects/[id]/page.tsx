@@ -2,17 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import { api, Project, SceneGraph } from '@/lib/api';
 import { Navbar } from '@/components/layout/Navbar';
 import { MaterialsBrowser } from '@/components/materials/MaterialsBrowser';
 import { AssistantChat } from '@/components/assistant/AssistantChat';
 import { RenderGallery } from '@/components/renders/RenderGallery';
-
-const SceneViewer = dynamic(
-  () => import('@/components/viewer/SceneViewer').then(m => ({ default: m.SceneViewer })),
-  { ssr: false, loading: () => <div className="h-[500px] w-full rounded-lg bg-navy-700 flex items-center justify-center text-navy-100">A carregar visualizador 3D...</div> }
-);
+import { SceneViewer } from '@/components/viewer/SceneViewer';
 
 const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'png', 'dwg', 'dxf', 'ifc', 'rvt'];
 const MAX_FILE_SIZE = 200 * 1024 * 1024;

@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
-interface AssistantMessage {
+export interface AssistantMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-interface AssistantAction {
+export interface AssistantAction {
   tool: string;
   args: Record<string, unknown>;
 }
